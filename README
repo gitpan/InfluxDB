@@ -21,12 +21,12 @@ SYNOPSIS
                     [30, 60, 10],
                 ],
             },
-        ) or die "write_points: " . $ix->status->{status_line};
+        ) or die "write_points: " . $ix->errstr;
     
         my $rs = $ix->query(
             q => 'select * from cpu',
             time_precision => 's',
-        ) or die "query: " . $ix->status->{status_line};
+        ) or die "query: " . $ix->errstr};
     
         # $rs is ArrayRef[HashRef]:
         # [
@@ -181,6 +181,9 @@ METHODS
 
     content => Str
         Response body.
+
+   errstr() :Str
+    Returns error message if previous query was failed.
 
    host() :Str
     Returns hostname of InfluxDB server.
