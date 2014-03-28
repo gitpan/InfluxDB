@@ -26,7 +26,7 @@ SYNOPSIS
         my $rs = $ix->query(
             q => 'select * from cpu',
             time_precision => 's',
-        ) or die "query: " . $ix->errstr};
+        ) or die "query: " . $ix->errstr;
     
         # $rs is ArrayRef[HashRef]:
         # [
@@ -62,15 +62,8 @@ SYNOPSIS
         # }
 
 DESCRIPTION
-    InfluxDB is a client library for InfluxDB <<http://influxdb.org>>.
-
-        **************************** CAUTION ****************************
-    
-        InfluxDB that is a time series database is still in development
-        status, so this module is also alpha state. Any API will change
-        without notice.
-    
-        *****************************************************************
+    This module `InfluxDB` is a client library for InfluxDB
+    <<http://influxdb.org>>.
 
 METHODS
   Class Methods
@@ -108,7 +101,10 @@ METHODS
         The precision timestamps should come back in. Valid options are s
         for seconds, m for milliseconds, and u for microseconds.
 
-   query(%args:Hash) :Bool
+   delete_points(name => Str) :Bool
+    Delete ALL DATA from series specified by *name*
+
+   query(%args:Hash) :ArrayRef
     q => Str
         The InfluxDB query language, see:
         <http://influxdb.org/docs/query_language/>
@@ -144,6 +140,22 @@ METHODS
           ]
         }
 
+   create_continuous_query(q => Str, name => Str) :ArrayRef
+    Create continuous query.
+
+        $ix->create_continuous_query(
+            q    => "select mean(sys) as sys, mean(usr) as usr from cpu group by time(15m)",
+            name => "cpu.15m",
+        );
+
+   list_continuous_queries() :ArrayRef
+    List continuous queries.
+
+   drop_continuous_query(id => Str) :ArrayRef
+    Delete continuous query that has specified id.
+
+    You can get id of continuous query by list_continuous_queries().
+
    switch_database(database => Str) :Bool
     Switch to another database.
 
@@ -166,6 +178,36 @@ METHODS
 
    delete_database(database => Str) :Bool
     Delete database. Requires cluster-admin privileges.
+
+   list_series() :ArrayRef[HashRef]
+    List series in current database
+
+   create_database_user(name => Str, password => Str) :Bool
+    Create a database user on current database.
+
+   delete_database_user(name => Str) :Bool
+    Delete a database user on current database.
+
+   update_database_user(name => Str [,password => Str] [,admin => Bool]) :Bool
+    Update a database user on current database.
+
+   list_database_users() :ArrayRef
+    List all database users on current database.
+
+   show_database_user(name => Str) :HashRef
+    Show a database user on current database.
+
+   create_cluster_admin(name => Str, password => Str) :Bool
+    Create a database user on current database.
+
+   delete_cluster_admin(name => Str) :Bool
+    Delete a database user on current database.
+
+   update_cluster_admin(name => Str, password => Str) :Bool
+    Update a database user on current database.
+
+   list_cluster_admins() :ArrayRef
+    List all database users on current database.
 
    status() :HashRef
     Returns status of previous request, as following hash:

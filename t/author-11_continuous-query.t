@@ -26,11 +26,6 @@ subtest 'new' => sub {
 };
 
 subtest 'database create' => sub {
-    # no privileges
-    ok(!$ix->create_database(database => $database));
-    is($ix->status->{status_line}, '401 Unauthorized');
-
-    # has admin privileges
     ok($ix->switch_user(%t::Util::Admin_User));
     ok($ix->create_database(database => $database));
     is($ix->status->{status_line}, '201 Created');
@@ -65,51 +60,33 @@ subtest 'points write, query, delete' => sub {
     is_deeply($points_got, $data->{points});
 };
 
-subtest 'points write, query, delete; HashRef' => sub {
-    ok($ix->delete_points(name => "s1"));
-
-    my $data = {
-        name    => "s1",
-        columns => [qw(foo bar baz)],
-        points  => [
-            [10, 20, 30],
-            [11, 21, 31],
-        ],
+subtest 'continuous queries' => sub {
+    subtest 'list continuous queries' => sub {
+        ok($r = $ix->list_continuous_queries);
+        ok(scalar(@{ $r->[0]{points} }) == 0);
     };
-    ok($ix->write_points(data =>   $data  )); # HashRef
 
-    ok($r = $ix->query(q => 'select * from s1'));
+    subtest 'create continuous query' => sub {
+        ok($ix->create_continuous_query(
+            q    => 'select max(foo) from s1 group by time(1m)',
+            name => 's1.1m',
+        ));
 
-    my $points_got = reorder_points($r, order => $data->{columns});
-    is_deeply($points_got, $data->{points});
-};
-
-subtest 'points write, query, delete; chunked' => sub {
-    ok($ix->delete_points(name => "s1"));
-
-    my $data = {
-        name    => "s1",
-        columns => [qw(foo bar baz)],
-        points  => [
-            [10, 20, 30],
-            [11, 21, 31],
-        ],
+        ok($r = $ix->list_continuous_queries);
+        ok(scalar(@{ $r->[0]{points} }) == 1);
     };
-    ok($ix->write_points(data => [ $data ])); # ArrayRef[HashRef]
 
-    ok($r = $ix->query(q => 'select * from s1', chunked => 1));
+    subtest 'drop continuous query' => sub {
+        $r = $ix->as_hash($r);
+        my $cq_id = $r->{"continuous queries"}[0]{id};
+        ok($ix->drop_continuous_query(id => $cq_id));
 
-    my $points_got = reorder_points($r, order => $data->{columns});
-    is_deeply($points_got, $data->{points});
+        ok($r = $ix->list_continuous_queries);
+        ok(scalar(@{ $r->[0]{points} }) == 0);
+    };
 };
 
 subtest 'database delete' => sub {
-    ok($ix->switch_user(%t::Util::DB_User));
-    # no privileges
-    ok(!$ix->delete_database(database => $database));
-    is($ix->status->{status_line}, '401 Unauthorized');
-
-    # has admin privileges
     ok($ix->switch_user(%t::Util::Admin_User));
     ok($ix->delete_database(database => $database));
     is($ix->status->{status_line}, '204 No Content');

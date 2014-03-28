@@ -2,9 +2,9 @@ package InfluxDB;
 
 use strict;
 use warnings;
-use 5.008_005;
+use 5.010_000;
 
-our $VERSION = '0.002';
+our $VERSION = '1.000';
 
 use Class::Accessor::Lite (
     new => 0,
@@ -20,8 +20,14 @@ use JSON 2;
 
 enum 'TimePrecision' => qw(s m u);
 
+subtype 'JSONBool' => as 'ScalarRef';
+coerce 'JSONBool'
+    => from 'Bool' => via { $_ ? \1 : \0 }
+    => from 'Object' => via { JSON::is_bool($_) ? ($_ == 1 ? \1 : \0) : \0 }
+;
+
 sub new {
-    my $rule = Data::Validator->new(
+    state $rule = Data::Validator->new(
         host     => { isa => 'Str' },
         port     => { isa => 'Int', default => 8086 },
         username => { isa => 'Str' },
@@ -108,9 +114,10 @@ sub as_hash {
 }
 
 sub switch_database {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         database => { isa => 'Str' },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     $self->{database} = $args->{database};
 
@@ -118,10 +125,11 @@ sub switch_database {
 }
 
 sub switch_user {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         username => { isa => 'Str' },
         password => { isa => 'Str' },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     $self->{username} = $args->{username};
     $self->{password} = $args->{password};
@@ -131,9 +139,10 @@ sub switch_user {
 
 ### database #############################################################
 sub create_database {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         database => { isa => 'Str' },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $url = $self->_build_url(
         path => '/db',
@@ -161,9 +170,10 @@ sub list_database {
 }
 
 sub delete_database {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         database => { isa => 'Str' },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $url = $self->_build_url(
         path => '/db/'. $args->{database},
@@ -175,12 +185,21 @@ sub delete_database {
     return $res->is_success ? 1 : ();
 }
 
+### series ###############################################################
+## hmmm v0.5.1 (latest version) returns empty response
+## https://github.com/FGRibreau/influxdb-cli/issues/8
+sub list_series {
+    my $self = shift;
+    return $self->query(q => "list series");
+}
+
 ### points ###############################################################
 sub write_points {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         data           => { isa => 'ArrayRef|HashRef' },
         time_precision => { isa => 'TimePrecision', optional => 1 },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $data = ref($args->{data}) eq 'ARRAY' ? $args->{data} : [$args->{data}];
     $data = $self->json->encode($data);
@@ -200,16 +219,10 @@ sub write_points {
 }
 
 sub delete_points {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         name  => { isa => 'Str' },
-        regex => { isa => 'Str', optional => 1 },
-        start => { isa => 'Int', optional => 1 },
-        end   => { isa => 'Int', optional => 1 },
-        i_know_what_i_do => { isa => 'Bool', default => 0 },
-    )->with('Method')->validate(@_);
-
-    croak "Disable this method because it seems that handling some parameters(start, end, regex) has not been implemented in InfluxDB v0.4.3, so delete ALL points. It's dangerous."
-        unless $args->{i_know_what_i_do};
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $url = $self->_build_url(
        path =>  '/db/' . $self->database . '/series/' . $args->{name},
@@ -225,30 +238,34 @@ sub delete_points {
 }
 
 sub create_scheduled_deletes {
-    croak "Not implemented in InfluxDB v0.4.3";
-    # my($self, $args) = Data::Validator->new(
-    # )->with('Method')->validate(@_);
+    croak "Not implemented in InfluxDB v0.5.1";
+    # state $rule = Data::Validator->new(
+    # )->with('Method');
+    # my($self, $args) = $rule->validate(@_);
 }
 
 sub list_scheduled_deletes {
-    croak "Not implemented in InfluxDB v0.4.3";
-    # my($self, $args) = Data::Validator->new(
-    # )->with('Method')->validate(@_);
+    croak "Not implemented in InfluxDB v0.5.1";
+    # state $rule = Data::Validator->new(
+    # )->with('Method');
+    # my($self, $args) = $rule->validate(@_);
 }
 
 sub delete_scheduled_deletes {
-    croak "Not implemented in InfluxDB v0.4.3";
-    # my($self, $args) = Data::Validator->new(
-    # )->with('Method')->validate(@_);
+    croak "Not implemented in InfluxDB v0.5.1";
+    # state $rule = Data::Validator->new(
+    # )->with('Method');
+    # my($self, $args) = $rule->validate(@_);
 }
 
 sub query {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         q              => { isa => 'Str' },
         time_precision => { isa => 'TimePrecision', optional => 1 },
         chunked        => { isa => 'Bool', default => 0 },
         # order          => { isa => 'Str', optional => 1 }, # not implemented?
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $url = $self->_build_url(
         path => '/db/' . $self->database . '/series',
@@ -276,31 +293,209 @@ sub query {
     }
 }
 
+### Continuous Queries ###################################################
+sub create_continuous_query {
+    state $rule = Data::Validator->new(
+        q    => { isa => 'Str' },
+        name => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    return $self->query(q => "$args->{q} into $args->{name}");
+}
+
+sub list_continuous_queries {
+    my $self = shift;
+    return $self->query(q => "list continuous queries");
+}
+
+sub drop_continuous_query {
+    state $rule = Data::Validator->new(
+        id => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    return $self->query(q => "drop continuous query $args->{id}");
+}
+
 ### user #################################################################
-# fixme TODO
-# get_list_cluster_admins
-# add_cluster_admin
-# update_cluster_admin_password
-# delete_cluster_admin
-# set_database_admin
-# unset_database_admin
-# alter_database_admin
-# get_list_database_admins
-# add_database_admin
-# update_database_admin_password
-# delete_database_admin
-# get_database_users
-# add_database_user
-# update_database_user_password
-# delete_database_user
-# update_permission
+sub create_database_user {
+    state $rule = Data::Validator->new(
+        name     => { isa => 'Str' },
+        password => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/db/' . $self->database . '/users',
+    );
+
+    my $res = $self->{ua}->post($url, [], $self->json->encode({
+        name     => $args->{name},
+        password => $args->{password},
+    }));
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub delete_database_user {
+    state $rule = Data::Validator->new(
+        name => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/db/' . $self->database . '/users/' . $args->{name},
+    );
+
+    my $res = $self->{ua}->delete($url);
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub update_database_user {
+    state $rule = Data::Validator->new(
+        name     => { isa => 'Str' },
+        password => { isa => 'Str', optional => 1 },
+        admin    => { isa => 'JSONBool', optional => 1 },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/db/' . $self->database . '/users/' . $args->{name},
+    );
+
+    my $res = $self->{ua}->post($url, [], $self->json->encode({
+        exists $args->{password} ? (password => $args->{password}) : (),
+        exists $args->{admin} ? (admin => $args->{admin}) : (),
+    }));
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub list_database_users {
+    my $self = shift;
+
+    my $url = $self->_build_url(
+        path => '/db/' . $self->database . '/users',
+    );
+
+    my $res = $self->{ua}->get($url);
+    $self->status($res);
+
+    return $res->is_success ? $self->json->decode($res->content) : ();
+}
+
+sub show_database_user {
+    state $rule = Data::Validator->new(
+        name => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/db/' . $self->database . '/users/' . $args->{name},
+    );
+
+    my $res = $self->{ua}->get($url);
+    $self->status($res);
+
+    return $res->is_success ? $self->json->decode($res->content) : ();
+}
+
+sub create_cluster_admin {
+    state $rule = Data::Validator->new(
+        name     => { isa => 'Str' },
+        password => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/cluster_admins',
+    );
+
+    my $res = $self->{ua}->post($url, [], $self->json->encode({
+        name     => $args->{name},
+        password => $args->{password},
+    }));
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub delete_cluster_admin {
+    state $rule = Data::Validator->new(
+        name => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/cluster_admins/' . $args->{name},
+    );
+
+    my $res = $self->{ua}->delete($url);
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub update_cluster_admin {
+    state $rule = Data::Validator->new(
+        name     => { isa => 'Str' },
+        password => { isa => 'Str' },
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
+
+    my $url = $self->_build_url(
+        path => '/cluster_admins/' . $args->{name},
+    );
+
+    my $res = $self->{ua}->post($url, [], $self->json->encode({
+        exists $args->{password} ? (password => $args->{password}) : (),
+    }));
+    $self->status($res);
+
+    return $res->is_success ? 1 : ();
+}
+
+sub list_cluster_admins {
+    my $self = shift;
+
+    my $url = $self->_build_url(
+        path => '/cluster_admins',
+    );
+
+    my $res = $self->{ua}->get($url);
+    $self->status($res);
+
+    return $res->is_success ? $self->json->decode($res->content) : ();
+}
+
+# sub show_cluster_admin {
+#     state $rule = Data::Validator->new(
+#         name => { isa => 'Str' },
+#     )->with('Method');
+#     my($self, $args) = $rule->validate(@_);
+
+#     my $url = $self->_build_url(
+#         path => '/cluster_admins/' . $args->{name},
+#     );
+
+#     my $res = $self->{ua}->get($url);
+#     $self->status($res);
+
+#     return $res->is_success ? $self->json->decode($res->content) : ();
+# }
 
 ### utils ################################################################
 sub _build_url {
-    my($self, $args) = Data::Validator->new(
+    state $rule = Data::Validator->new(
         path => { isa => 'Str' },
         qs   => { isa => 'HashRef', optional => 1 },
-    )->with('Method')->validate(@_);
+    )->with('Method');
+    my($self, $args) = $rule->validate(@_);
 
     my $url = sprintf("http://%s:%s@%s:%d%s",
                       $self->username,
@@ -378,7 +573,7 @@ To install this module, run the following commands:
     my $rs = $ix->query(
         q => 'select * from cpu',
         time_precision => 's',
-    ) or die "query: " . $ix->errstr};
+    ) or die "query: " . $ix->errstr;
     
     # $rs is ArrayRef[HashRef]:
     # [
@@ -415,15 +610,7 @@ To install this module, run the following commands:
 
 =head1 DESCRIPTION
 
-InfluxDB is a client library for InfluxDB E<lt>L<http://influxdb.org>E<gt>.
-
-    **************************** CAUTION ****************************
-    
-    InfluxDB that is a time series database is still in development
-    status, so this module is also alpha state. Any API will change
-    without notice.
-    
-    *****************************************************************
+This module `InfluxDB` is a client library for InfluxDB E<lt>L<http://influxdb.org>E<gt>.
 
 =head1 METHODS
 
@@ -481,13 +668,11 @@ The precision timestamps should come back in. Valid options are s for seconds, m
 
 =back
 
-=begin comment
+=head3 B<delete_points>(name => Str) :Bool
 
-=item B<delete_points>() :Bool
+Delete ALL DATA from series specified by I<name>
 
-=end comment
-
-=head3 B<query>(%args:Hash) :Bool
+=head3 B<query>(%args:Hash) :ArrayRef
 
 =over 4
 
@@ -530,6 +715,25 @@ Takes result of C<query()>(ArrayRef) and convert into following HashRef.
       ]
     }
 
+=head3 B<create_continuous_query>(q => Str, name => Str) :ArrayRef
+
+Create continuous query.
+
+    $ix->create_continuous_query(
+        q    => "select mean(sys) as sys, mean(usr) as usr from cpu group by time(15m)",
+        name => "cpu.15m",
+    );
+
+=head3 B<list_continuous_queries>() :ArrayRef
+
+List continuous queries.
+
+=head3 B<drop_continuous_query>(id => Str) :ArrayRef
+
+Delete continuous query that has specified id.
+
+You can get id of continuous query by list_continuous_queries().
+
 =head3 B<switch_database>(database => Str) :Bool
 
 Switch to another database.
@@ -557,6 +761,54 @@ List database. Requires cluster-admin privileges.
 =head3 B<delete_database>(database => Str) :Bool
 
 Delete database. Requires cluster-admin privileges.
+
+=head3 B<list_series>() :ArrayRef[HashRef]
+
+List series in current database
+
+=head3 B<create_database_user>(name => Str, password => Str) :Bool
+
+Create a database user on current database.
+
+=head3 B<delete_database_user>(name => Str) :Bool
+
+Delete a database user on current database.
+
+=head3 B<update_database_user>(name => Str [,password => Str] [,admin => Bool]) :Bool
+
+Update a database user on current database.
+
+=head3 B<list_database_users>() :ArrayRef
+
+List all database users on current database.
+
+=head3 B<show_database_user>(name => Str) :HashRef
+
+Show a database user on current database.
+
+=head3 B<create_cluster_admin>(name => Str, password => Str) :Bool
+
+Create a database user on current database.
+
+=head3 B<delete_cluster_admin>(name => Str) :Bool
+
+Delete a database user on current database.
+
+=head3 B<update_cluster_admin>(name => Str, password => Str) :Bool
+
+Update a database user on current database.
+
+=head3 B<list_cluster_admins>() :ArrayRef
+
+List all database users on current database.
+
+=begin comment
+
+=head3 B<show_cluster_admin>(name => Str) :HashRef
+
+Show a database user on current database.
+
+=end comment
 
 =head3 B<status>() :HashRef
 

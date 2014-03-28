@@ -12,6 +12,8 @@ t/00_compile.t
 t/01_new.t
 t/Util.pm
 t/author-10_basic.t
+t/author-11_continuous-query.t
+t/author-12_user-management.t
 t/author-critic.t
 t/author-dependencies.t
 t/author-pod-spell.t
